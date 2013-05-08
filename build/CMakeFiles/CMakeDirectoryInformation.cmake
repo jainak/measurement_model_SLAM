@@ -24,6 +24,7 @@ SET(CMAKE_C_INCLUDE_PATH
   "/opt/ros/fuerte/stacks/bond_core/bondcpp/include"
   "/opt/ros/fuerte/stacks/bond_core/bond/msg_gen/cpp/include"
   "/opt/ros/fuerte/stacks/bond_core/smclib/include"
+  "../msg_gen/cpp/include"
   )
 SET(CMAKE_CXX_INCLUDE_PATH ${CMAKE_C_INCLUDE_PATH})
 SET(CMAKE_Fortran_INCLUDE_PATH ${CMAKE_C_INCLUDE_PATH})

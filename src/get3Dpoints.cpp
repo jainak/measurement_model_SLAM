@@ -18,6 +18,8 @@
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PoseStamped.h>
 #include "sensor_msgs/image_encodings.h"
+#include <sensor_model_ardrone/Feature_msg.h>
+#include <sensor_model_ardrone/Measurement_data.h>
 #include <stdexcept>
 
 #include <cmath>
@@ -32,6 +34,7 @@ using namespace sensor_msgs::image_encodings;
 //image_transport::Publisher img_pub;
 ros::Publisher marker_pub;
 ros::Publisher pose_pub;
+ros::Publisher measurement_pub;
 static const char WINDOW[] = "Output";
 
 int edgeThresh = 1;
@@ -56,8 +59,8 @@ Mat image_t_minus_4 ,image_t_minus_5 ,image_t_minus_6;
 int frame_it = 0, frame_num = 1;
 
 class SIFT_Feature{
-	
-	public:
+
+public:
 	float r[3];
 	float q[4];
 	float u0, v0, ut, vt;
@@ -266,8 +269,6 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
 	pose.pose.orientation.z = qC[2];
 	pose.pose.orientation.w = qC[3];
 	
-	pose_pub.publish(pose);
-	
 	//Set type of point to be published
     points.header.frame_id = "/my_frame";
     points.header.stamp = ros::Time::now();
@@ -344,6 +345,7 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
 	updateRobotTransform();
 	//updateCandidates(im1, keypoints2, good_matches);
 	vector<KeyPoint> consistent_candidates;
+	vector<sensor_model_ardrone::Feature_msg> feature_pub;
 	int flag_frame_drop = 1;
 	
 	for (int i = 0; i < keypoints2.size(); i++){
@@ -406,19 +408,37 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
 				circle(disparity_image, keypoints3[match_check[match_ind].queryIdx].pt, 1.5, Scalar(255,255,0), -1, 8);  
 				
 				geometry_msgs::Point p;
+				sensor_model_ardrone::Feature_msg feat_msg;
 			    p.x = pointMapping.at<float>(0,0);
       			p.y = pointMapping.at<float>(0,1);
       			p.z = pointMapping.at<float>(0,2);
-				points.points.push_back(p);
 				flag_frame_drop = 0;
 				
-				double x_thresh = 1.0;
-				double y_thresh = 1.0;
-				double z_thresh = 1.0;
-				if (p.x-rC[0] > x_thresh && p.y-rC[0] > y_thresh && p.z-rC[0] > z_thresh){
+				double x_thresh = 0.3;
+				double y_thresh = 0.3;
+				double z_thresh = 0.3;
+				if (abs(p.x-rC[0]) > x_thresh && abs(p.y-rC[0]) > y_thresh && abs(p.z-rC[0]) > z_thresh){
 					f.position = p;
 					consistent_candidates.push_back(f.data);
 					candidates.push_back(f);
+					points.points.push_back(p);
+					
+					feat_msg.px = f.ut;
+					feat_msg.py = f.vt;
+					
+					feat_msg.f.x = f.data.pt.x;
+					feat_msg.f.y = f.data.pt.y;
+					feat_msg.f.size = f.data.size;
+					feat_msg.f.response = f.data.response;
+					feat_msg.f.octave = f.data.octave;
+					feat_msg.f.class_id = f.data.class_id;
+					
+					feat_msg.posX = p.x;
+					feat_msg.posY = p.y;
+					feat_msg.posZ = p.z;
+					
+					feature_pub.push_back(feat_msg);
+					
 					break;				
 				}else
 					continue;
@@ -432,7 +452,6 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
 			}
 		}
 	}
-	
 	
 	//cout << "K1:" << keypoints1.size() << "\t K2:" << keypoints2.size() << "\t M:" << matches.size() << endl;
 	
@@ -471,7 +490,15 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
 		points.points.push_back(p);
 	}
 	imshow(WINDOW, disparity_image);
+	
 	marker_pub.publish(points);
+	sensor_model_ardrone::Measurement_data data;
+	data.features = feature_pub;
+	ROS_INFO("Feature vector size: %d, Measurement size: %d", feature_pub.size(),data.features.size());
+	measurement_pub.publish(data);
+	pose_pub.publish(pose);
+	
+	
 	waitKey(3);
 	//return points;
 	
@@ -558,8 +585,6 @@ void imageCallback(Mat frame){
 	
 }
 
-
-    
 int main(int argc, char **argv)
 {
 	ros::init(argc, argv, "sensor_data_pointcloud");
@@ -571,7 +596,8 @@ int main(int argc, char **argv)
 	//ros::Rate r(30);
 	marker_pub = nh.advertise<visualization_msgs::Marker>("/points_keypoints", 1);
 	pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/pose_ardrone", 1);
-
+	measurement_pub = nh.advertise<sensor_model_ardrone::Measurement_data>("/measurement_ardrone", 1);
+	
 	namedWindow(WINDOW, CV_WINDOW_AUTOSIZE);
 	
 	//image_transport::Subscriber sub = it.subscribe("camera/image_raw", 1, imageCallback);

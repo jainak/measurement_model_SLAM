@@ -1,4 +1,7 @@
 FILE(REMOVE_RECURSE
+  "../msg_gen"
+  "../src/sensor_model_ardrone/msg"
+  "../msg_gen"
   "CMakeFiles/test-results-run"
 )
 
