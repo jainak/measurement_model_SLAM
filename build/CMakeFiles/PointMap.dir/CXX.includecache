@@ -109,6 +109,8 @@ visualization_msgs/Marker.h
 -
 geometry_msgs/Point.h
 -
+geometry_msgs/Pose.h
+-
 geometry_msgs/PoseStamped.h
 -
 sensor_msgs/image_encodings.h

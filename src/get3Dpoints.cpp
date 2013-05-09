@@ -16,6 +16,7 @@
 
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
 #include "sensor_msgs/image_encodings.h"
 #include <sensor_model_ardrone/Feature_msg.h>
@@ -48,12 +49,24 @@ Mat image_t_minus_3;
 float rC[3] = {0};
 float qC[4] = {0};
 //Mat qC = Mat(1,4,CV_64F);
-float focal = 209.12;
+//ARDrone 1 calibration paramters
+/*float focal = 209.12;
 float radial_distortion = 0.00000003;
 float u0c = 160.194;
 float v0c = 121.474;
+*/
+
+//ARDrone 2 calibration paramters
+float focal = 561.691;
+float radial_distortion = 0.000249;
+float u0c = 319.66;
+float v0c = 178.113;
+
+
 float timeStep = 0.1;
-float vx = 0.5;
+float vx = 0.0;
+float vy = 0.0;
+float vz = 0.0;
 
 Mat image_t_minus_4 ,image_t_minus_5 ,image_t_minus_6;
 int frame_it = 0, frame_num = 1;
@@ -247,9 +260,18 @@ Mat calculateParallax(SIFT_Feature f, float ut, float vt){
 	
 }
 
+void update_robot_controls(const geometry_msgs::Pose::ConstPtr& data){
+	vx = data->position.x;
+	vy = data->position.y;
+	vz = data->position.z;
+
+}
+
 void updateRobotTransform(){
 	
 	rC[0] = rC[0] + vx*timeStep;
+	rC[1] = rC[1] + vy*timeStep;
+	rC[2] = rC[2] + vz*timeStep;
 	//cout << "POS:" << rC[0] << endl;
 }
 
@@ -416,15 +438,15 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
 				
 				double x_thresh = 0.3;
 				double y_thresh = 0.3;
-				double z_thresh = 0.3;
+				double z_thresh = 0.0;
 				if (abs(p.x-rC[0]) > x_thresh && abs(p.y-rC[0]) > y_thresh && abs(p.z-rC[0]) > z_thresh){
 					f.position = p;
 					consistent_candidates.push_back(f.data);
 					candidates.push_back(f);
 					points.points.push_back(p);
 					
-					feat_msg.px = f.ut;
-					feat_msg.py = f.vt;
+					feat_msg.px = keypoints1[good_matches[j].queryIdx].pt.x;
+					feat_msg.py = keypoints1[good_matches[j].queryIdx].pt.y;
 					
 					feat_msg.f.x = f.data.pt.x;
 					feat_msg.f.y = f.data.pt.y;
@@ -519,9 +541,9 @@ void initializeRobotConfig(){
 }
 
 
-//void imageCallback(const sensor_msgs::ImageConstPtr& original_image){
-void imageCallback(Mat frame){
-	/*cv_bridge::CvImagePtr cv_ptr;
+void imageCallback(const sensor_msgs::ImageConstPtr& original_image){
+//void imageCallback(Mat frame){
+	cv_bridge::CvImagePtr cv_ptr;
 	try
 	{
 		//Always copy, returning a mutable CvImage
@@ -538,7 +560,7 @@ void imageCallback(Mat frame){
 
 	
 	//LIVE video feed from uvc_cam
-	//Mat frame = cv_ptr->image;*/
+	Mat frame = cv_ptr->image;
 	//visualization_msgs::Marker points;
 	if (frame_it % 5 == 0){
 		if (frame_num > 6){
@@ -596,12 +618,16 @@ int main(int argc, char **argv)
 	//ros::Rate r(30);
 	marker_pub = nh.advertise<visualization_msgs::Marker>("/points_keypoints", 1);
 	pose_pub = nh.advertise<geometry_msgs::PoseStamped>("/pose_ardrone", 1);
-	measurement_pub = nh.advertise<sensor_model_ardrone::Measurement_data>("/measurement_ardrone", 1);
+	measurement_pub = nh.advertise<sensor_model_ardrone::Measurement_data>("/measurement_data", 1);
+	ros::Subscriber motion_sub = nh.subscribe("/motion_model_data",1, update_robot_controls);
 	
 	namedWindow(WINDOW, CV_WINDOW_AUTOSIZE);
 	
 	//image_transport::Subscriber sub = it.subscribe("camera/image_raw", 1, imageCallback);
-	VideoCapture cap("run3.mp4"); // open the video
+	image_transport::Subscriber sub = it.subscribe("/ardrone/image_raw", 1, imageCallback);
+	
+	
+	/*VideoCapture cap("run3.mp4"); // open the video
 	//VideoCapture cap("ardrone3.mp4"); // open the video
 	if(!cap.isOpened())  // check if we succeeded
         return -1;
@@ -614,7 +640,7 @@ int main(int argc, char **argv)
 		imageCallback(frame);
 		if(waitKey(10) >= 0) 
 			break;
-	}
+	}*/
 
 	//img_pub = it.advertise("camera/siftDrone", 1);
 	destroyWindow(WINDOW);
