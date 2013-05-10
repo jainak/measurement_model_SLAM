@@ -50,24 +50,28 @@ float rC[3] = {0};
 float qC[4] = {0};
 //Mat qC = Mat(1,4,CV_64F);
 //ARDrone 1 calibration paramters
-/*float focal = 209.12;
+float focal = 209.12;
 float radial_distortion = 0.00000003;
 float u0c = 160.194;
 float v0c = 121.474;
-*/
-
-//ARDrone 2 calibration paramters
-float focal = 561.691;
-float radial_distortion = 0.000249;
-float u0c = 319.66;
-float v0c = 178.113;
-
 
 float timeStep = 0.1;
-float vx = 0.0;
+float vx = 0.4;
 float vy = 0.0;
 float vz = 0.0;
 
+
+//ARDrone 2 calibration paramters
+/*float focal = 561.691;
+float radial_distortion = 0.000000249;
+float u0c = 319.66;
+float v0c = 178.113;
+
+float timeStep = 5.0;
+float vx = 0.0;
+float vy = 0.0;
+float vz = 0.0;
+*/
 Mat image_t_minus_4 ,image_t_minus_5 ,image_t_minus_6;
 int frame_it = 0, frame_num = 1;
 
@@ -159,12 +163,12 @@ Mat calculate3DPoint( Mat ht, float alpha, float beta, float baseline){
 	float depth = abs((baseline*sin(beta))/sin(alpha));
 	Mat world_co = Mat(1,3,CV_64F);
 	//cout << "Azimuth:" << azimuth << endl;
-	ROS_INFO("Azimuth %f", azimuth);
-	ROS_INFO("Elevation %f", elevation);
+	//ROS_INFO("Azimuth %f", azimuth);
+	//ROS_INFO("Elevation %f", elevation);
 	//cout << "Elevation:" << elevation << endl;
 	
 	double thresh_parallax = 0.0001;
-	double thresh_depth = 4.0;
+	double thresh_depth = 7.0;
 	//double thresh_x_axis = 50.0;
 	if(abs(alpha) > thresh_parallax && depth < thresh_depth){
 		world_co.at<float>(0,0) = rC[0] + depth*cos(elevation)*cos(azimuth);
@@ -225,13 +229,13 @@ Mat calculateParallax(SIFT_Feature f, float ut, float vt){
 	//cout << "ht: " << ht.at<float>(0,0) << " " << ht.at<float>(0,1) << " " << ht.at<float>(0,2) << endl;
 	Mat b1 = Mat(1,3,CV_64F);
 	b1.at<float>(0,0) = 2.0*vx*timeStep;
-	b1.at<float>(0,1) = 0;
-	b1.at<float>(0,2) = 0;
+	b1.at<float>(0,1) = 2.0*vy*timeStep;
+	b1.at<float>(0,2) = 2.0*vz*timeStep;
 	
 	Mat b2 = Mat(1,3,CV_64F);
 	b2.at<float>(0,0) = -2.0*vx*timeStep;
-	b2.at<float>(0,1) = 0;
-	b2.at<float>(0,2) = 0;
+	b2.at<float>(0,1) = -2.0*vz*timeStep;
+	b2.at<float>(0,2) = -2.0*vz*timeStep;
 	
 	float alpha = 0.0, beta = 0.0, gamma = 0.0, h1norm = 0.0, htnorm = 0.0, base = 0.0;
 	
@@ -247,7 +251,7 @@ Mat calculateParallax(SIFT_Feature f, float ut, float vt){
 	gamma = acos(gamma/(htnorm*base));
 	
 	alpha = 3.14 - (beta + gamma);
-	ROS_INFO("Alpha: %f", alpha);
+	//ROS_INFO("Alpha: %f", alpha);
 	//cout << "beta: " << beta << " Gamma: " << gamma << endl;
 	//cout << "h1norm: " << h1norm << " htnorm: " << htnorm << endl;
 	//cout << "Alpha " << alpha << endl;
@@ -261,9 +265,9 @@ Mat calculateParallax(SIFT_Feature f, float ut, float vt){
 }
 
 void update_robot_controls(const geometry_msgs::Pose::ConstPtr& data){
-	vx = data->position.x;
-	vy = data->position.y;
-	vz = data->position.z;
+	//vx = data->position.x;
+	//vy = data->position.y;
+	//vz = data->position.z;
 
 }
 
@@ -306,7 +310,7 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
     points.color.g = 1.0f;
     points.color.a = 1.0;
 	
-	ROS_INFO("Matching features...");
+	//ROS_INFO("Matching features...");
 	Mat im1, im2, im3, im4;
 	
 	im1 = input_image;
@@ -358,12 +362,12 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
   	vector<DMatch> good_matches;
 
   	for( int i = 0; i < descriptors1.rows; i++ ){ 
-  		if( matches[i].distance < 4*min_dist ){
+  		if( matches[i].distance < 6*min_dist ){
   			good_matches.push_back( matches[i]); 
   		}
   	}
 
-	ROS_INFO("Updating transform... ");
+	//ROS_INFO("Updating transform... ");
 	updateRobotTransform();
 	//updateCandidates(im1, keypoints2, good_matches);
 	vector<KeyPoint> consistent_candidates;
@@ -396,7 +400,7 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
   		int match_ind = 0;
   		float pix_thresh = 5.0;
   		for (int k = 0; k < match_check.size(); k++){
-			if( match_check[k].distance <= 4*min_dist ){
+			if( match_check[k].distance <= 3*min_dist ){
 				if (abs(keypoints3[match_check[k].queryIdx].pt.x - k1[match_check[k].trainIdx].pt.x) < pix_thresh && abs(keypoints3[match_check[k].queryIdx].pt.y - k1[match_check[k].trainIdx].pt.y) < pix_thresh){
 		  				consistent_feature = true;
 		  				match_ind = k;
@@ -425,7 +429,7 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
 			if (match_flag && consistent_feature){
 				//Add new feature candidtes
 				Mat pointMapping = calculateParallax(f, keypoints1[good_matches[j].queryIdx].pt.x, keypoints1[good_matches[j].queryIdx].pt.y);
-				line(disparity_image, keypoints1[good_matches[j].queryIdx].pt, keypoints3[match_check[match_ind].queryIdx].pt, Scalar(255,0,255), 2, 8);
+				line(disparity_image, keypoints2[good_matches[j].trainIdx].pt, keypoints3[match_check[match_ind].queryIdx].pt, Scalar(255,0,255), 2, 8);
 				circle(disparity_image, keypoints1[good_matches[j].queryIdx].pt, 1.5, Scalar(255,255,0), -1, 8);
 				circle(disparity_image, keypoints3[match_check[match_ind].queryIdx].pt, 1.5, Scalar(255,255,0), -1, 8);  
 				
@@ -436,8 +440,8 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
       			p.z = pointMapping.at<float>(0,2);
 				flag_frame_drop = 0;
 				
-				double x_thresh = 0.3;
-				double y_thresh = 0.3;
+				double x_thresh = 1.0;
+				double y_thresh = 1.0;
 				double z_thresh = 0.0;
 				if (abs(p.x-rC[0]) > x_thresh && abs(p.y-rC[0]) > y_thresh && abs(p.z-rC[0]) > z_thresh){
 					f.position = p;
@@ -516,7 +520,7 @@ void matchFeatures(Mat input_image, Mat image_t1, Mat image_t2, Mat image_t3){
 	marker_pub.publish(points);
 	sensor_model_ardrone::Measurement_data data;
 	data.features = feature_pub;
-	ROS_INFO("Feature vector size: %d, Measurement size: %d", feature_pub.size(),data.features.size());
+	//ROS_INFO("Feature vector size: %d, Measurement size: %d", feature_pub.size(),data.features.size());
 	measurement_pub.publish(data);
 	pose_pub.publish(pose);
 	
@@ -541,9 +545,9 @@ void initializeRobotConfig(){
 }
 
 
-void imageCallback(const sensor_msgs::ImageConstPtr& original_image){
-//void imageCallback(Mat frame){
-	cv_bridge::CvImagePtr cv_ptr;
+//void imageCallback(const sensor_msgs::ImageConstPtr& original_image){
+void imageCallback(Mat frame){
+	/*cv_bridge::CvImagePtr cv_ptr;
 	try
 	{
 		//Always copy, returning a mutable CvImage
@@ -560,9 +564,9 @@ void imageCallback(const sensor_msgs::ImageConstPtr& original_image){
 
 	
 	//LIVE video feed from uvc_cam
-	Mat frame = cv_ptr->image;
+	Mat frame = cv_ptr->image;*/
 	//visualization_msgs::Marker points;
-	if (frame_it % 5 == 0){
+	if (frame_it % 1 == 0){
 		if (frame_num > 6){
 	    	//imshow("CHECK1", image_t_minus_1);
 	    	//imshow("CHECK2", frame);
@@ -612,7 +616,7 @@ int main(int argc, char **argv)
 	ros::init(argc, argv, "sensor_data_pointcloud");
 	ros::NodeHandle nh;
 	image_transport::ImageTransport it(nh);
-	ROS_INFO("Initializing robot config");
+	//ROS_INFO("Initializing robot config");
 	initializeRobotConfig();
 	
 	//ros::Rate r(30);
@@ -624,10 +628,10 @@ int main(int argc, char **argv)
 	namedWindow(WINDOW, CV_WINDOW_AUTOSIZE);
 	
 	//image_transport::Subscriber sub = it.subscribe("camera/image_raw", 1, imageCallback);
-	image_transport::Subscriber sub = it.subscribe("/ardrone/image_raw", 1, imageCallback);
+	//image_transport::Subscriber sub = it.subscribe("/ardrone/image_raw", 1, imageCallback);
 	
 	
-	/*VideoCapture cap("run3.mp4"); // open the video
+	VideoCapture cap("run3.mp4"); // open the video
 	//VideoCapture cap("ardrone3.mp4"); // open the video
 	if(!cap.isOpened())  // check if we succeeded
         return -1;
@@ -640,8 +644,8 @@ int main(int argc, char **argv)
 		imageCallback(frame);
 		if(waitKey(10) >= 0) 
 			break;
-	}*/
-
+	}
+	
 	//img_pub = it.advertise("camera/siftDrone", 1);
 	destroyWindow(WINDOW);
 	ros::spin();
